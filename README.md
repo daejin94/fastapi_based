@@ -27,35 +27,29 @@
 
 # 프로젝트 구조
 
-app/
-  main.py
-
-  api/
-    v1/
-      routers/
-
-  services/
-
-  repositories/
-
-  models/
-
-  schemas/
-
-  core/
-    config.py
-    security.py
-    exceptions.py
-
-  db/
-    session.py
-    base.py
-
-  dependencies/
-
-  utils/
-
-tests/
+backend/
+│
+├─ app/
+│  ├─ main.py
+│  ├─ api/
+│  │  └─ v1/
+│  │     └─ routers/
+│  ├─ services/
+│  ├─ repositories/
+│  ├─ models/
+│  ├─ schemas/
+│  ├─ core/
+│  │  ├─ config.py
+│  │  ├─ security.py
+│  │  └─ exceptions.py
+│  ├─ db/
+│  │  ├─ session.py
+│  │  └─ base.py
+│  ├─ dependencies/
+│  └─ utils/
+│
+├─ tests/
+└─ alembic/
 
 ---
 
