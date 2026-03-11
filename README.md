@@ -26,31 +26,29 @@
 ---
 
 # 프로젝트 구조
-
-backend/
-│
-├─ app/
-│  ├─ main.py
-│  ├─ api/
-│  │  └─ v1/
-│  │     └─ routers/
-│  ├─ services/
-│  ├─ repositories/
-│  ├─ models/
-│  ├─ schemas/
-│  ├─ core/
-│  │  ├─ config.py
-│  │  ├─ security.py
-│  │  └─ exceptions.py
-│  ├─ db/
-│  │  ├─ session.py
-│  │  └─ base.py
-│  ├─ dependencies/
-│  └─ utils/
-│
-├─ tests/
-└─ alembic/
-
+```BASH
+backend
+├── app
+│   ├── main.py
+│   ├── api
+│   │   └── v1
+│   │       └── routers
+│   ├── services
+│   ├── repositories
+│   ├── models
+│   ├── schemas
+│   ├── core
+│   │   ├── config.py
+│   │   ├── security.py
+│   │   └── exceptions.py
+│   ├── db
+│   │   ├── session.py
+│   │   └── base.py
+│   ├── dependencies
+│   └── utils
+├── tests
+└── alembic
+```
 ---
 
 # 아키텍처
