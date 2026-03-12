@@ -1,3 +1,4 @@
+import logging
 from collections.abc import Sequence
 from typing import Any
 
@@ -5,6 +6,9 @@ from fastapi import FastAPI, Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
+
+
+logger = logging.getLogger("app.error")
 
 
 class AppException(Exception):
@@ -64,7 +68,14 @@ def _error_response(
     return JSONResponse(status_code=status_code, content=payload)
 
 
-async def app_exception_handler(_: Request, exc: AppException) -> JSONResponse:
+async def app_exception_handler(request: Request, exc: AppException) -> JSONResponse:
+    logger.warning(
+        "Application exception handled | method=%s path=%s code=%s detail=%s",
+        request.method,
+        request.url.path,
+        exc.error_code,
+        exc.detail,
+    )
     return _error_response(
         status_code=exc.status_code,
         code=exc.error_code,
@@ -72,7 +83,14 @@ async def app_exception_handler(_: Request, exc: AppException) -> JSONResponse:
     )
 
 
-async def http_exception_handler(_: Request, exc: StarletteHTTPException) -> JSONResponse:
+async def http_exception_handler(request: Request, exc: StarletteHTTPException) -> JSONResponse:
+    logger.warning(
+        "HTTP exception handled | method=%s path=%s status=%s detail=%s",
+        request.method,
+        request.url.path,
+        exc.status_code,
+        exc.detail,
+    )
     return _error_response(
         status_code=exc.status_code,
         code="http_error",
@@ -81,9 +99,15 @@ async def http_exception_handler(_: Request, exc: StarletteHTTPException) -> JSO
 
 
 async def validation_exception_handler(
-    _: Request,
+    request: Request,
     exc: RequestValidationError,
 ) -> JSONResponse:
+    logger.warning(
+        "Validation exception handled | method=%s path=%s errors=%s",
+        request.method,
+        request.url.path,
+        len(exc.errors()),
+    )
     return _error_response(
         status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
         code="validation_error",
@@ -92,7 +116,13 @@ async def validation_exception_handler(
     )
 
 
-async def unhandled_exception_handler(_: Request, exc: Exception) -> JSONResponse:
+async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+    logger.exception(
+        "Unhandled exception | method=%s path=%s",
+        request.method,
+        request.url.path,
+        exc_info=exc,
+    )
     return _error_response(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
         code="internal_server_error",
