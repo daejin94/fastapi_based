@@ -7,9 +7,11 @@ from sqlalchemy.orm import Session
 from app.db.session import get_db
 from app.dependencies.redis import get_redis
 from app.schemas.auth import (
+    AccessTokenAPIResponse,
     AccessTokenResponse,
     LoginRequest,
     RefreshTokenRequest,
+    TokenPairAPIResponse,
     TokenPairResponse,
 )
 from app.services.auth_service import AuthService
@@ -18,21 +20,21 @@ from app.services.auth_service import AuthService
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 
-@router.post("/login", response_model=TokenPairResponse)
-def login(
+@router.post("/login", response_model=TokenPairAPIResponse)
+async def login(
     payload: LoginRequest,
     db: Annotated[Session, Depends(get_db)],
     redis: Annotated[Redis, Depends(get_redis)],
-) -> TokenPairResponse:
+) -> TokenPairAPIResponse:
     service = AuthService(db, redis)
-    return service.login(email=payload.email, password=payload.password)
+    return TokenPairAPIResponse(data=service.login(email=payload.email, password=payload.password))
 
 
-@router.post("/refresh", response_model=AccessTokenResponse)
-def refresh_access_token(
+@router.post("/refresh", response_model=AccessTokenAPIResponse)
+async def refresh_access_token(
     payload: RefreshTokenRequest,
     db: Annotated[Session, Depends(get_db)],
     redis: Annotated[Redis, Depends(get_redis)],
-) -> AccessTokenResponse:
+) -> AccessTokenAPIResponse:
     service = AuthService(db, redis)
-    return service.refresh_access_token(payload.refresh_token)
+    return AccessTokenAPIResponse(data=service.refresh_access_token(payload.refresh_token))

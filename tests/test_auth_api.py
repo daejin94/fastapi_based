@@ -2,6 +2,10 @@ import importlib
 import sys
 from pathlib import Path
 
+import httpx
+import pytest
+
+
 class FakeRedis:
     def __init__(self) -> None:
         self._store: dict[str, str] = {}
@@ -24,103 +28,134 @@ def _clear_app_modules() -> None:
 
 def _build_auth_context(tmp_path: Path, monkeypatch):
     monkeypatch.setenv("DATABASE_URL", f"sqlite:///{tmp_path / 'test.db'}")
-    monkeypatch.setenv("SECRET_KEY", "test-secret-key")
+    monkeypatch.setenv("SECRET_KEY", "test-secret-key-with-32-plus-bytes")
     monkeypatch.setenv("REDIS_URL", "redis://localhost:6379/15")
     monkeypatch.setenv("SEED_USER_EMAIL", "admin@example.com")
     monkeypatch.setenv("SEED_USER_PASSWORD", "password1234")
+    monkeypatch.setenv("APP_DEBUG", "false")
 
     _clear_app_modules()
-    importlib.import_module("app.main")
-    auth_router = importlib.import_module("app.api.v1.routers.auth")
     fake_redis = FakeRedis()
+    app_main = importlib.import_module("app.main")
+    monkeypatch.setattr(app_main, "create_redis_client", lambda: fake_redis)
 
-    from app.db.session import SessionLocal, init_db
-    from app.services.auth_service import AuthService
-
-    init_db()
-    db = SessionLocal()
-    try:
-        AuthService(db, fake_redis).ensure_seed_user(
-            email="admin@example.com",
-            password="password1234",
-        )
-        return auth_router, db, fake_redis
-    except Exception:
-        db.close()
-        raise
+    return app_main.app
 
 
-def test_login_returns_access_and_refresh_tokens(tmp_path, monkeypatch) -> None:
-    auth_router, db, redis = _build_auth_context(tmp_path, monkeypatch)
-    try:
-        response = auth_router.login(
-            payload=auth_router.LoginRequest(
-                email="admin@example.com",
-                password="password1234",
-            ),
-            db=db,
-            redis=redis,
-        )
-    finally:
-        db.close()
-
-    assert response.access_token
-    assert response.refresh_token
-    assert response.token_type == "bearer"
-    assert response.access_token_expires_in > 0
-    assert response.refresh_token_expires_in > 0
+async def _create_client(app):
+    transport = httpx.ASGITransport(app=app)
+    return httpx.AsyncClient(transport=transport, base_url="http://testserver")
 
 
-def test_refresh_issues_new_access_token(tmp_path, monkeypatch) -> None:
-    auth_router, db, redis = _build_auth_context(tmp_path, monkeypatch)
-    try:
-        login_response = auth_router.login(
-            payload=auth_router.LoginRequest(
-                email="admin@example.com",
-                password="password1234",
-            ),
-            db=db,
-            redis=redis,
-        )
-        refresh_token = login_response.refresh_token
+@pytest.mark.anyio
+async def test_login_returns_access_and_refresh_tokens(tmp_path, monkeypatch) -> None:
+    app = _build_auth_context(tmp_path, monkeypatch)
 
-        refresh_response = auth_router.refresh_access_token(
-            payload=auth_router.RefreshTokenRequest(refresh_token=refresh_token),
-            db=db,
-            redis=redis,
-        )
-    finally:
-        db.close()
-
-    assert refresh_response.access_token
-    assert refresh_response.token_type == "bearer"
-    assert refresh_response.access_token_expires_in > 0
-
-
-def test_refresh_rejects_access_token(tmp_path, monkeypatch) -> None:
-    auth_router, db, redis = _build_auth_context(tmp_path, monkeypatch)
-    try:
-        login_response = auth_router.login(
-            payload=auth_router.LoginRequest(
-                email="admin@example.com",
-                password="password1234",
-            ),
-            db=db,
-            redis=redis,
-        )
-        access_token = login_response.access_token
-
-        try:
-            auth_router.refresh_access_token(
-                payload=auth_router.RefreshTokenRequest(refresh_token=access_token),
-                db=db,
-                redis=redis,
+    async with app.router.lifespan_context(app):
+        async with await _create_client(app) as client:
+            response = await client.post(
+                "/api/v1/auth/login",
+                json={"email": "admin@example.com", "password": "password1234"},
             )
-            raised = None
-        except Exception as exc:
-            raised = exc
-    finally:
-        db.close()
 
-    assert raised.status_code == 401
-    assert raised.detail == "Invalid token type."
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["success"] is True
+    assert payload["message"] is None
+    assert payload["data"]["access_token"]
+    assert payload["data"]["refresh_token"]
+    assert payload["data"]["token_type"] == "bearer"
+    assert payload["data"]["access_token_expires_in"] > 0
+    assert payload["data"]["refresh_token_expires_in"] > 0
+
+
+@pytest.mark.anyio
+async def test_refresh_issues_new_access_token(tmp_path, monkeypatch) -> None:
+    app = _build_auth_context(tmp_path, monkeypatch)
+
+    async with app.router.lifespan_context(app):
+        async with await _create_client(app) as client:
+            login_response = await client.post(
+                "/api/v1/auth/login",
+                json={"email": "admin@example.com", "password": "password1234"},
+            )
+            refresh_token = login_response.json()["data"]["refresh_token"]
+
+            refresh_response = await client.post(
+                "/api/v1/auth/refresh",
+                json={"refresh_token": refresh_token},
+            )
+
+    assert refresh_response.status_code == 200
+    payload = refresh_response.json()
+    assert payload["success"] is True
+    assert payload["message"] is None
+    assert payload["data"]["access_token"]
+    assert payload["data"]["token_type"] == "bearer"
+    assert payload["data"]["access_token_expires_in"] > 0
+
+
+@pytest.mark.anyio
+async def test_login_returns_global_exception_response_for_invalid_credentials(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    app = _build_auth_context(tmp_path, monkeypatch)
+
+    async with app.router.lifespan_context(app):
+        async with await _create_client(app) as client:
+            response = await client.post(
+                "/api/v1/auth/login",
+                json={"email": "admin@example.com", "password": "wrong-password"},
+            )
+
+    assert response.status_code == 401
+    assert response.json() == {
+        "code": "invalid_credentials",
+        "detail": "Invalid email or password.",
+    }
+
+
+@pytest.mark.anyio
+async def test_refresh_rejects_access_token_with_global_exception_response(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    app = _build_auth_context(tmp_path, monkeypatch)
+
+    async with app.router.lifespan_context(app):
+        async with await _create_client(app) as client:
+            login_response = await client.post(
+                "/api/v1/auth/login",
+                json={"email": "admin@example.com", "password": "password1234"},
+            )
+            access_token = login_response.json()["data"]["access_token"]
+
+            response = await client.post(
+                "/api/v1/auth/refresh",
+                json={"refresh_token": access_token},
+            )
+
+    assert response.status_code == 401
+    assert response.json() == {
+        "code": "invalid_token_type",
+        "detail": "Invalid token type.",
+    }
+
+
+@pytest.mark.anyio
+async def test_login_validation_error_uses_global_handler(tmp_path, monkeypatch) -> None:
+    app = _build_auth_context(tmp_path, monkeypatch)
+
+    async with app.router.lifespan_context(app):
+        async with await _create_client(app) as client:
+            response = await client.post(
+                "/api/v1/auth/login",
+                json={"email": "admin@example.com"},
+            )
+
+    payload = response.json()
+    assert response.status_code == 422
+    assert payload["code"] == "validation_error"
+    assert payload["detail"] == "Validation error."
+    assert payload["errors"][0]["loc"][-1] == "password"

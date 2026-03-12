@@ -1,10 +1,15 @@
 from datetime import datetime
 
 import jwt
-from fastapi import HTTPException, status
 from redis import Redis
 from sqlalchemy.orm import Session
 
+from app.core.exceptions import (
+    InvalidCredentialsError,
+    InvalidRefreshTokenError,
+    InvalidTokenTypeError,
+    RefreshTokenNotValidError,
+)
 from app.core.security import (
     create_access_token,
     create_refresh_token,
@@ -32,14 +37,14 @@ class AuthService:
     def login(self, *, email: str, password: str) -> TokenPairResponse:
         user = self.user_repository.get_by_email(email)
         if user is None or not verify_password(password, user.password_hash):
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid email or password.",
-            )
+            raise InvalidCredentialsError()
 
         access_token, access_expires_at = create_access_token(str(user.id))
         refresh_token, refresh_jti, refresh_expires_at = create_refresh_token(str(user.id))
-        refresh_ttl = max(int((refresh_expires_at - datetime.now(refresh_expires_at.tzinfo)).total_seconds()), 1)
+        refresh_ttl = max(
+            int((refresh_expires_at - datetime.now(refresh_expires_at.tzinfo)).total_seconds()),
+            1,
+        )
         self.redis.setex(self._refresh_key(user.id), refresh_ttl, refresh_jti)
 
         return TokenPairResponse(
@@ -56,32 +61,20 @@ class AuthService:
         try:
             payload = decode_token(refresh_token)
         except jwt.InvalidTokenError as exc:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid refresh token.",
-            ) from exc
+            raise InvalidRefreshTokenError() from exc
 
         if payload.get("type") != "refresh":
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid token type.",
-            )
+            raise InvalidTokenTypeError()
 
         subject = payload.get("sub")
         refresh_jti = payload.get("jti")
         if subject is None or refresh_jti is None:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid refresh token.",
-            )
+            raise InvalidRefreshTokenError()
 
         user = self.user_repository.get_by_id(int(subject))
         stored_jti = self.redis.get(self._refresh_key(int(subject)))
         if user is None or stored_jti != refresh_jti:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Refresh token is no longer valid.",
-            )
+            raise RefreshTokenNotValidError()
 
         access_token, access_expires_at = create_access_token(str(user.id))
         access_ttl = max(

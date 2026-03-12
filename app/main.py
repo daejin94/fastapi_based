@@ -4,8 +4,10 @@ from fastapi import FastAPI
 
 from app.api.v1.api import api_router
 from app.core.config import get_settings
+from app.core.exceptions import register_exception_handlers
 from app.db.session import SessionLocal, init_db
 from app.dependencies.redis import create_redis_client
+from app.schemas.common import APIResponse
 from app.services.auth_service import AuthService
 
 
@@ -35,9 +37,10 @@ app = FastAPI(
     debug=settings.app_debug,
     lifespan=lifespan,
 )
+register_exception_handlers(app)
 app.include_router(api_router)
 
 
-@app.get("/")
-def health_check():
-    return {"status": "ok"}
+@app.get("/", response_model=APIResponse[dict[str, str]])
+async def health_check() -> APIResponse[dict[str, str]]:
+    return APIResponse(data={"status": "ok"})
