@@ -247,6 +247,8 @@ Client
 - REST 스타일 유지
 - 요청/응답 Schema 분리
 - `response_model` 지정
+- 별도 요구사항이 없으면 인증이 필요한 보호 API로 설계
+- 공개 API는 문서에서 명시적으로 예외 선언
 
 예시
 

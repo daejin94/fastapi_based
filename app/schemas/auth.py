@@ -33,9 +33,21 @@ class AccessTokenResponse(BaseModel):
     access_token_expires_in: int
 
 
+class CurrentUserResponse(BaseModel):
+    id: int
+    email: str
+    is_active: bool
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 class TokenPairAPIResponse(APIResponse[TokenPairResponse]):
     pass
 
 
 class AccessTokenAPIResponse(APIResponse[AccessTokenResponse]):
+    pass
+
+
+class CurrentUserAPIResponse(APIResponse[CurrentUserResponse]):
     pass

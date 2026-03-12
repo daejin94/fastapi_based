@@ -5,10 +5,14 @@ from redis import Redis
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
+from app.dependencies.auth import get_current_user
 from app.dependencies.redis import get_redis
+from app.models.user import User
 from app.schemas.auth import (
     AccessTokenAPIResponse,
     AccessTokenResponse,
+    CurrentUserAPIResponse,
+    CurrentUserResponse,
     LoginRequest,
     RefreshTokenRequest,
     TokenPairAPIResponse,
@@ -28,6 +32,13 @@ async def login(
 ) -> TokenPairAPIResponse:
     service = AuthService(db, redis)
     return TokenPairAPIResponse(data=service.login(email=payload.email, password=payload.password))
+
+
+@router.get("/me", response_model=CurrentUserAPIResponse)
+async def read_current_user(
+    current_user: Annotated[User, Depends(get_current_user)],
+) -> CurrentUserAPIResponse:
+    return CurrentUserAPIResponse(data=CurrentUserResponse.model_validate(current_user))
 
 
 @router.post("/refresh", response_model=AccessTokenAPIResponse)

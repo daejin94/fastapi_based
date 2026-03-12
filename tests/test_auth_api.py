@@ -100,6 +100,30 @@ async def test_refresh_issues_new_access_token(tmp_path, monkeypatch) -> None:
 
 
 @pytest.mark.anyio
+async def test_me_returns_authenticated_user(tmp_path, monkeypatch) -> None:
+    app = _build_auth_context(tmp_path, monkeypatch)
+
+    async with app.router.lifespan_context(app):
+        async with await _create_client(app) as client:
+            login_response = await client.post(
+                "/api/v1/auth/login",
+                json={"email": "admin@example.com", "password": "password1234"},
+            )
+            access_token = login_response.json()["data"]["access_token"]
+
+            response = await client.get(
+                "/api/v1/auth/me",
+                headers={"Authorization": f"Bearer {access_token}"},
+            )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["success"] is True
+    assert payload["data"]["email"] == "admin@example.com"
+    assert payload["data"]["is_active"] is True
+
+
+@pytest.mark.anyio
 async def test_login_returns_global_exception_response_for_invalid_credentials(
     tmp_path,
     monkeypatch,
@@ -138,6 +162,45 @@ async def test_refresh_rejects_access_token_with_global_exception_response(
             response = await client.post(
                 "/api/v1/auth/refresh",
                 json={"refresh_token": access_token},
+            )
+
+    assert response.status_code == 401
+    assert response.json() == {
+        "code": "invalid_token_type",
+        "detail": "Invalid token type.",
+    }
+
+
+@pytest.mark.anyio
+async def test_me_requires_bearer_token(tmp_path, monkeypatch) -> None:
+    app = _build_auth_context(tmp_path, monkeypatch)
+
+    async with app.router.lifespan_context(app):
+        async with await _create_client(app) as client:
+            response = await client.get("/api/v1/auth/me")
+
+    assert response.status_code == 401
+    assert response.json() == {
+        "code": "authentication_required",
+        "detail": "Authentication credentials were not provided.",
+    }
+
+
+@pytest.mark.anyio
+async def test_me_rejects_refresh_token(tmp_path, monkeypatch) -> None:
+    app = _build_auth_context(tmp_path, monkeypatch)
+
+    async with app.router.lifespan_context(app):
+        async with await _create_client(app) as client:
+            login_response = await client.post(
+                "/api/v1/auth/login",
+                json={"email": "admin@example.com", "password": "password1234"},
+            )
+            refresh_token = login_response.json()["data"]["refresh_token"]
+
+            response = await client.get(
+                "/api/v1/auth/me",
+                headers={"Authorization": f"Bearer {refresh_token}"},
             )
 
     assert response.status_code == 401

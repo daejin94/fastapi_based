@@ -5,7 +5,9 @@ from redis import Redis
 from sqlalchemy.orm import Session
 
 from app.core.exceptions import (
+    AuthenticatedUserNotFoundError,
     InvalidCredentialsError,
+    InvalidAccessTokenError,
     InvalidRefreshTokenError,
     InvalidTokenTypeError,
     RefreshTokenNotValidError,
@@ -17,12 +19,13 @@ from app.core.security import (
     hash_password,
     verify_password,
 )
+from app.models.user import User
 from app.repositories.user_repository import UserRepository
 from app.schemas.auth import AccessTokenResponse, TokenPairResponse
 
 
 class AuthService:
-    def __init__(self, db: Session, redis: Redis) -> None:
+    def __init__(self, db: Session, redis: Redis | None) -> None:
         self.user_repository = UserRepository(db)
         self.redis = redis
 
@@ -45,7 +48,7 @@ class AuthService:
             int((refresh_expires_at - datetime.now(refresh_expires_at.tzinfo)).total_seconds()),
             1,
         )
-        self.redis.setex(self._refresh_key(user.id), refresh_ttl, refresh_jti)
+        self._require_redis().setex(self._refresh_key(user.id), refresh_ttl, refresh_jti)
 
         return TokenPairResponse(
             access_token=access_token,
@@ -72,7 +75,7 @@ class AuthService:
             raise InvalidRefreshTokenError()
 
         user = self.user_repository.get_by_id(int(subject))
-        stored_jti = self.redis.get(self._refresh_key(int(subject)))
+        stored_jti = self._require_redis().get(self._refresh_key(int(subject)))
         if user is None or stored_jti != refresh_jti:
             raise RefreshTokenNotValidError()
 
@@ -86,6 +89,35 @@ class AuthService:
             access_token_expires_in=access_ttl,
         )
 
+    def get_current_user(self, access_token: str) -> User:
+        try:
+            payload = decode_token(access_token)
+        except jwt.InvalidTokenError as exc:
+            raise InvalidAccessTokenError() from exc
+
+        if payload.get("type") != "access":
+            raise InvalidTokenTypeError()
+
+        subject = payload.get("sub")
+        if subject is None:
+            raise InvalidAccessTokenError()
+
+        try:
+            user_id = int(subject)
+        except (TypeError, ValueError) as exc:
+            raise InvalidAccessTokenError() from exc
+
+        user = self.user_repository.get_by_id(user_id)
+        if user is None or not user.is_active:
+            raise AuthenticatedUserNotFoundError()
+
+        return user
+
     @staticmethod
     def _refresh_key(user_id: int) -> str:
         return f"auth:refresh:{user_id}"
+
+    def _require_redis(self) -> Redis:
+        if self.redis is None:
+            raise RuntimeError("Redis client is required for this operation.")
+        return self.redis

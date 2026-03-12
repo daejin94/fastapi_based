@@ -35,9 +35,19 @@ class AuthenticationError(AppException):
     detail = "Authentication failed."
 
 
+class AuthenticationRequiredError(AuthenticationError):
+    error_code = "authentication_required"
+    detail = "Authentication credentials were not provided."
+
+
 class InvalidCredentialsError(AuthenticationError):
     error_code = "invalid_credentials"
     detail = "Invalid email or password."
+
+
+class InvalidAccessTokenError(AuthenticationError):
+    error_code = "invalid_access_token"
+    detail = "Invalid access token."
 
 
 class InvalidRefreshTokenError(AuthenticationError):
@@ -53,6 +63,11 @@ class InvalidTokenTypeError(AuthenticationError):
 class RefreshTokenNotValidError(AuthenticationError):
     error_code = "refresh_token_not_valid"
     detail = "Refresh token is no longer valid."
+
+
+class AuthenticatedUserNotFoundError(AuthenticationError):
+    error_code = "authenticated_user_not_found"
+    detail = "Authenticated user not found."
 
 
 def _error_response(

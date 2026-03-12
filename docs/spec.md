@@ -5,6 +5,7 @@
 - 인증 API 제공
 - 로그인 시 access token, refresh token 발급
 - refresh token으로 access token 재발급
+- access token 기반 현재 사용자 인증 dependency 제공
 - 성공 응답은 공통 `APIResponse` 포맷 사용
 - 전역 예외 핸들러를 통한 공통 오류 응답 반환
 - 환경 변수 기반 CORS 설정 제공
@@ -14,8 +15,17 @@
 ## 인증 API 요구사항
 
 - `POST /api/v1/auth/login`
+- `GET /api/v1/auth/me`
 - `POST /api/v1/auth/refresh`
 - 요청과 응답은 Pydantic 스키마를 사용
+
+## 인증 Dependency 요구사항
+
+- `Authorization: Bearer <access_token>` 형식의 헤더를 사용한다.
+- 인증 dependency는 access token을 검증하고 현재 사용자를 조회해야 한다.
+- refresh token은 보호된 엔드포인트 인증에 사용할 수 없어야 한다.
+- 별도 요청이 없는 신규 API는 기본적으로 인증 dependency를 적용해야 한다.
+- 인증 없이 열어야 하는 공개 API는 요구사항 문서에서 명시적으로 선언해야 한다.
 
 ## 예외 응답 요구사항
 

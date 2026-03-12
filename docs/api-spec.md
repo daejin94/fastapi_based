@@ -42,6 +42,30 @@
 }
 ```
 
+### 현재 사용자 조회
+
+`GET /api/v1/auth/me`
+
+요청 헤더 예시
+
+```http
+Authorization: Bearer <access_token>
+```
+
+응답 예시
+
+```json
+{
+  "success": true,
+  "data": {
+    "id": 1,
+    "email": "admin@example.com",
+    "is_active": true
+  },
+  "message": null
+}
+```
+
 ### Access Token 재발급
 
 `POST /api/v1/auth/refresh`

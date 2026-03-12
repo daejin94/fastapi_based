@@ -10,3 +10,4 @@
 - `app/logs` 기반 파일 로깅 추가
 - 요청/예외 로그를 일 단위 로테이션으로 저장하도록 구성
 - 환경 변수 기반 CORS 설정과 preflight 테스트 추가
+- access token 기반 현재 사용자 인증 dependency와 `/auth/me` 추가
