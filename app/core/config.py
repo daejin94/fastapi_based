@@ -16,6 +16,10 @@ class Settings(BaseSettings):
     app_name: str = Field(default="Backend API", alias="APP_NAME")
     app_env: str = Field(default="local", alias="APP_ENV")
     app_debug: bool = Field(default=True, alias="APP_DEBUG")
+    cors_allow_origins_raw: str = Field(default="*", alias="CORS_ALLOW_ORIGINS")
+    cors_allow_methods_raw: str = Field(default="*", alias="CORS_ALLOW_METHODS")
+    cors_allow_headers_raw: str = Field(default="*", alias="CORS_ALLOW_HEADERS")
+    cors_allow_credentials: bool = Field(default=False, alias="CORS_ALLOW_CREDENTIALS")
     app_log_dir: str = Field(default="app/logs", alias="APP_LOG_DIR")
     app_log_level: str = Field(default="INFO", alias="APP_LOG_LEVEL")
     app_log_backup_count: int = Field(default=30, alias="APP_LOG_BACKUP_COUNT")
@@ -55,7 +59,24 @@ class Settings(BaseSettings):
         project_root = Path(__file__).resolve().parents[2]
         return project_root / log_dir
 
+    @property
+    def cors_allow_origins(self) -> list[str]:
+        return _split_csv(self.cors_allow_origins_raw)
+
+    @property
+    def cors_allow_methods(self) -> list[str]:
+        return _split_csv(self.cors_allow_methods_raw)
+
+    @property
+    def cors_allow_headers(self) -> list[str]:
+        return _split_csv(self.cors_allow_headers_raw)
+
 
 @lru_cache
 def get_settings() -> Settings:
     return Settings()
+
+
+def _split_csv(value: str) -> list[str]:
+    items = [item.strip() for item in value.split(",")]
+    return [item for item in items if item]

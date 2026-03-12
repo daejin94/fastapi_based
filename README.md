@@ -147,6 +147,10 @@ pytest
 - `REDIS_URL`: refresh token 상태 저장용 Redis 주소
 - `SEED_USER_EMAIL`: 기본 로그인 계정 이메일
 - `SEED_USER_PASSWORD`: 기본 로그인 계정 비밀번호
+- `CORS_ALLOW_ORIGINS`: 허용할 Origin 목록, 쉼표로 구분
+- `CORS_ALLOW_METHODS`: 허용할 HTTP Method 목록, 쉼표로 구분
+- `CORS_ALLOW_HEADERS`: 허용할 요청 헤더 목록, 쉼표로 구분
+- `CORS_ALLOW_CREDENTIALS`: credential 허용 여부
 - `APP_LOG_DIR`: 애플리케이션 로그 저장 디렉터리
 - `APP_LOG_LEVEL`: 애플리케이션 로그 레벨
 - `APP_LOG_BACKUP_COUNT`: 일 단위 로그 파일 보관 개수

@@ -33,6 +33,10 @@ def _build_auth_context(tmp_path: Path, monkeypatch):
     monkeypatch.setenv("SEED_USER_EMAIL", "admin@example.com")
     monkeypatch.setenv("SEED_USER_PASSWORD", "password1234")
     monkeypatch.setenv("APP_DEBUG", "false")
+    monkeypatch.setenv("CORS_ALLOW_ORIGINS", "http://localhost:3000")
+    monkeypatch.setenv("CORS_ALLOW_METHODS", "GET,POST,OPTIONS")
+    monkeypatch.setenv("CORS_ALLOW_HEADERS", "Authorization,Content-Type")
+    monkeypatch.setenv("CORS_ALLOW_CREDENTIALS", "false")
 
     _clear_app_modules()
     fake_redis = FakeRedis()
@@ -159,3 +163,41 @@ async def test_login_validation_error_uses_global_handler(tmp_path, monkeypatch)
     assert payload["code"] == "validation_error"
     assert payload["detail"] == "Validation error."
     assert payload["errors"][0]["loc"][-1] == "password"
+
+
+@pytest.mark.anyio
+async def test_cors_allows_configured_origin_preflight(tmp_path, monkeypatch) -> None:
+    app = _build_auth_context(tmp_path, monkeypatch)
+
+    async with app.router.lifespan_context(app):
+        async with await _create_client(app) as client:
+            response = await client.options(
+                "/api/v1/auth/login",
+                headers={
+                    "Origin": "http://localhost:3000",
+                    "Access-Control-Request-Method": "POST",
+                    "Access-Control-Request-Headers": "Authorization,Content-Type",
+                },
+            )
+
+    assert response.status_code == 200
+    assert response.headers["access-control-allow-origin"] == "http://localhost:3000"
+    assert "POST" in response.headers["access-control-allow-methods"]
+
+
+@pytest.mark.anyio
+async def test_cors_rejects_unconfigured_origin_preflight(tmp_path, monkeypatch) -> None:
+    app = _build_auth_context(tmp_path, monkeypatch)
+
+    async with app.router.lifespan_context(app):
+        async with await _create_client(app) as client:
+            response = await client.options(
+                "/api/v1/auth/login",
+                headers={
+                    "Origin": "http://evil.example.com",
+                    "Access-Control-Request-Method": "POST",
+                },
+            )
+
+    assert response.status_code == 400
+    assert "access-control-allow-origin" not in response.headers
