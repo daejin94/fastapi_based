@@ -157,47 +157,7 @@ PostgreSQL 사용 시 `DATABASE_URL`은 `postgresql+psycopg://...` 형식을 사
 
 ---
 
-# 인증 API
+# API 문서
 
-## 로그인
-
-`POST /api/v1/auth/login`
-
-```json
-{
-  "email": "admin@example.com",
-  "password": "change_me_1234"
-}
-```
-
-응답 예시
-
-```json
-{
-  "access_token": "....",
-  "refresh_token": "....",
-  "token_type": "bearer",
-  "access_token_expires_in": 1800,
-  "refresh_token_expires_in": 604800
-}
-```
-
-## Access Token 재발급
-
-`POST /api/v1/auth/refresh`
-
-```json
-{
-  "refresh_token": "...."
-}
-```
-
-응답 예시
-
-```json
-{
-  "access_token": "....",
-  "token_type": "bearer",
-  "access_token_expires_in": 1800
-}
-```
+- 인증 API 호출 예시는 `docs/api-spec.md`에서 관리합니다.
+- 실행 중인 Swagger 문서는 `http://localhost:8000/docs`에서 확인할 수 있습니다.
