@@ -1,4 +1,5 @@
 from functools import lru_cache
+from pathlib import Path
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -15,6 +16,9 @@ class Settings(BaseSettings):
     app_name: str = Field(default="Backend API", alias="APP_NAME")
     app_env: str = Field(default="local", alias="APP_ENV")
     app_debug: bool = Field(default=True, alias="APP_DEBUG")
+    app_log_dir: str = Field(default="app/logs", alias="APP_LOG_DIR")
+    app_log_level: str = Field(default="INFO", alias="APP_LOG_LEVEL")
+    app_log_backup_count: int = Field(default=30, alias="APP_LOG_BACKUP_COUNT")
 
     database_url: str = Field(
         default="postgresql+psycopg://user:password@localhost:5432/app",
@@ -41,6 +45,15 @@ class Settings(BaseSettings):
         default="change_me_1234",
         alias="SEED_USER_PASSWORD",
     )
+
+    @property
+    def app_log_dir_path(self) -> Path:
+        log_dir = Path(self.app_log_dir)
+        if log_dir.is_absolute():
+            return log_dir
+
+        project_root = Path(__file__).resolve().parents[2]
+        return project_root / log_dir
 
 
 @lru_cache

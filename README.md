@@ -147,8 +147,13 @@ pytest
 - `REDIS_URL`: refresh token 상태 저장용 Redis 주소
 - `SEED_USER_EMAIL`: 기본 로그인 계정 이메일
 - `SEED_USER_PASSWORD`: 기본 로그인 계정 비밀번호
+- `APP_LOG_DIR`: 애플리케이션 로그 저장 디렉터리
+- `APP_LOG_LEVEL`: 애플리케이션 로그 레벨
+- `APP_LOG_BACKUP_COUNT`: 일 단위 로그 파일 보관 개수
 
 PostgreSQL 사용 시 `DATABASE_URL`은 `postgresql+psycopg://...` 형식을 사용합니다.
+
+로그는 기본적으로 `app/logs/app.log` 파일에 기록되며, 자정마다 일 단위로 로테이션됩니다.
 
 ---
 
